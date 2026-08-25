@@ -57,11 +57,12 @@ jobs:
           library="$(find build -type f -name '${{ matrix.library }}' | head -n 1)"
           test -n "$library"
           cp "$library" "dist/${{ matrix.library }}"
-          echo "FTS5_BIGRAM_EXTENSION=$PWD/dist/${{ matrix.library }}" >> "$GITHUB_ENV"
       - name: Verify universal macOS binary
         if: runner.os == 'macOS'
-        run: lipo -verify_arch arm64 x86_64 dist/${{ matrix.library }}
+        run: lipo dist/${{ matrix.library }} -verify_arch arm64 x86_64
       - name: Test loadable extension
+        env:
+          FTS5_BIGRAM_EXTENSION: ${{ github.workspace }}/dist/${{ matrix.library }}
         run: cargo test --test loadable
       - uses: actions/upload-artifact@v7
         with:

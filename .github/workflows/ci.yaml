@@ -27,7 +27,7 @@ jobs:
       - name: Test static registration
         run: cargo test --test sqlite
       - name: Configure CMake
-        run: cmake -S . -B build
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
       - name: Build static and loadable libraries
         run: cmake --build build --config Release
       - name: Install CMake package

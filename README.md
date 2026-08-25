@@ -42,7 +42,7 @@ The Go adapter is CGO-free and registers the tokenizer on every new
 `modernc.org/sqlite` connection.
 
 ```sh
-go get github.com/hakazv/sqlite-fts5-bigram/driver/modernc
+go get github.com/hakazv/sqlite-fts5-bigram/driver/modernc@v0.1.0
 ```
 
 Import the adapter for its side effect before opening connections:
@@ -67,7 +67,7 @@ Add the Git dependency:
 ```toml
 [dependencies]
 rusqlite = { version = "0.40.2", features = ["bundled"] }
-sqlite-fts5-bigram = { git = "https://github.com/hakazv/sqlite-fts5-bigram.git" }
+sqlite-fts5-bigram = { git = "https://github.com/hakazv/sqlite-fts5-bigram.git", tag = "v0.1.0" }
 ```
 
 SSH is also supported: `ssh://git@github.com/hakazv/sqlite-fts5-bigram.git`.
