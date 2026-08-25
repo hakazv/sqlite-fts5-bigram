@@ -3,6 +3,9 @@ fn main() {
         "csrc/fts5_bigram.c",
         "csrc/unicode_bigram.c",
         "csrc/unicode_bigram.h",
+        "csrc/unicode_lower.c",
+        "csrc/unicode_lower.h",
+        "csrc/unicode_lower_table.inc",
         "include/sqlite3_fts5_bigram.h",
         "third_party/sqlite/sqlite3.h",
     ] {
@@ -12,6 +15,7 @@ fn main() {
     cc::Build::new()
         .file("csrc/fts5_bigram.c")
         .file("csrc/unicode_bigram.c")
+        .file("csrc/unicode_lower.c")
         .include("csrc")
         .include("include")
         .include("third_party/sqlite")

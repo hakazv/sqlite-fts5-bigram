@@ -17,7 +17,7 @@ impl fmt::Display for PhraseQueryError {
 impl std::error::Error for PhraseQueryError {}
 
 /// Returns `text` as an escaped FTS5 phrase suitable for binding to a `MATCH`
-/// parameter. The tokenizer does not normalize or fold case.
+/// parameter.
 pub fn phrase_query(text: &str) -> Result<String, PhraseQueryError> {
     if text.chars().take(2).count() < 2 {
         return Err(PhraseQueryError::TooShort);

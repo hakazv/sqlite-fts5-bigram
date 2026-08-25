@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(sqlite_fts5_bigram VERSION 0.1.0 LANGUAGES C)
+project(sqlite_fts5_bigram VERSION 0.2.0 LANGUAGES C)
 
 include(GNUInstallDirs)
 
@@ -10,6 +10,7 @@ set(CMAKE_C_EXTENSIONS OFF)
 set(BIGRAM_SOURCES
     csrc/fts5_bigram.c
     csrc/unicode_bigram.c
+    csrc/unicode_lower.c
 )
 
 add_library(fts5_bigram_static STATIC ${BIGRAM_SOURCES})
@@ -79,7 +80,12 @@ install(FILES LICENSE DESTINATION "${CMAKE_INSTALL_DATADIR}/licenses/sqlite_fts5
 
 include(CTest)
 if(BUILD_TESTING)
-    add_executable(tokenizer_test tests/tokenizer.c csrc/unicode_bigram.c)
+    add_executable(
+        tokenizer_test
+        tests/tokenizer.c
+        csrc/unicode_bigram.c
+        csrc/unicode_lower.c
+    )
     target_include_directories(tokenizer_test PRIVATE csrc)
     if(MSVC)
         target_compile_options(tokenizer_test PRIVATE /UNDEBUG)
@@ -88,6 +94,8 @@ if(BUILD_TESTING)
     endif()
     add_test(
         NAME tokenizer_core
-        COMMAND tokenizer_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/tokenizer-corpus.tsv
+        COMMAND tokenizer_test
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/tokenizer-corpus.tsv
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/casefold-corpus.tsv
     )
 endif()

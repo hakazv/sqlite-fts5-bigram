@@ -20,6 +20,19 @@ fn registers_and_rejects_arguments() {
              );"
         )
         .is_err());
+    for specification in [
+        "unicode_bigram case_sensitive",
+        "unicode_bigram case_sensitive 2",
+        "unicode_bigram unexpected 1",
+    ] {
+        assert!(connection
+            .execute_batch(&format!(
+                "CREATE VIRTUAL TABLE invalid_options USING fts5(\
+                     text, tokenize='{specification}'\
+                 );"
+            ))
+            .is_err());
+    }
 }
 
 #[test]
@@ -72,6 +85,34 @@ fn phrase_query_rejects_text_that_cannot_produce_a_bigram() {
             Err(sqlite_fts5_bigram::PhraseQueryError::TooShort)
         );
     }
+}
+
+#[test]
+fn folds_case_by_default_and_can_be_case_sensitive() {
+    let connection = connection();
+    connection
+        .execute_batch(
+            "CREATE VIRTUAL TABLE folded USING fts5(text, tokenize='unicode_bigram');
+             CREATE VIRTUAL TABLE sensitive USING fts5(
+                 text, tokenize='unicode_bigram case_sensitive 1'
+             );
+             INSERT INTO folded(text) VALUES ('Alpha ÄPFEL');
+             INSERT INTO sensitive(text) VALUES ('Alpha ÄPFEL');",
+        )
+        .unwrap();
+
+    let query = sqlite_fts5_bigram::phrase_query("äpfel").unwrap();
+    let count = |table: &str| {
+        connection
+            .query_row(
+                &format!("SELECT count(*) FROM {table} WHERE {table} MATCH ?1"),
+                [&query],
+                |row| row.get::<_, i64>(0),
+            )
+            .unwrap()
+    };
+    assert_eq!(count("folded"), 1);
+    assert_eq!(count("sensitive"), 0);
 }
 
 #[test]

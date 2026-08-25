@@ -14,9 +14,15 @@ Requirements:
 - SQLite 3.47.0 or newer with FTS5
 - Valid UTF-8 input
 
-The tokenizer uses adjacent Unicode code points exactly as provided. It does
-not normalize or fold case, and inputs shorter than two code points emit no
-tokens. Normalize indexed text and queries in the application when needed.
+The tokenizer uses adjacent Unicode code points and is case-insensitive by
+default. It does not perform Unicode normalization or remove diacritics, and
+inputs shorter than two code points emit no tokens.
+
+Use `case_sensitive 1` for exact case matching:
+
+```sql
+tokenize = 'unicode_bigram case_sensitive 1'
+```
 
 Use quoted FTS5 phrases to preserve bigram adjacency:
 
@@ -42,7 +48,7 @@ The Go adapter is CGO-free and registers the tokenizer on every new
 `modernc.org/sqlite` connection.
 
 ```sh
-go get github.com/hakazv/sqlite-fts5-bigram/driver/modernc@v0.1.0
+go get github.com/hakazv/sqlite-fts5-bigram/driver/modernc@v0.2.0
 ```
 
 Import the adapter for its side effect before opening connections:
@@ -70,7 +76,7 @@ Add the Git dependency:
 ```toml
 [dependencies]
 rusqlite = { version = "0.40.2", features = ["bundled"] }
-sqlite-fts5-bigram = { git = "https://github.com/hakazv/sqlite-fts5-bigram.git", tag = "v0.1.0" }
+sqlite-fts5-bigram = { git = "https://github.com/hakazv/sqlite-fts5-bigram.git", tag = "v0.2.0" }
 ```
 
 SSH is also supported: `ssh://git@github.com/hakazv/sqlite-fts5-bigram.git`.

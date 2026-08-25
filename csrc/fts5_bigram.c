@@ -1,9 +1,11 @@
 #include "sqlite3.h"
 #include "sqlite3_fts5_bigram.h"
 #include "unicode_bigram.h"
+#include "unicode_lower.h"
 
 #include <limits.h>
 #include <stddef.h>
+#include <string.h>
 
 #ifndef SQLITE_CORE
 #include "sqlite3ext.h"
@@ -11,12 +13,13 @@ SQLITE_EXTENSION_INIT1
 #endif
 
 typedef struct BigramTokenizer {
-    unsigned char allocated;
+    unsigned char case_sensitive;
 } BigramTokenizer;
 
 typedef struct Fts5Callback {
     void *context;
     int (*token)(void *, int, const char *, int, int, int);
+    int case_sensitive;
 } Fts5Callback;
 
 static void set_error(char **error, const char *message) {
@@ -58,17 +61,33 @@ static int tokenizer_create(
     Fts5Tokenizer **output
 ) {
     BigramTokenizer *tokenizer;
+    int index;
     (void)unused;
-    (void)arguments;
 
-    if (argument_count != 0 || output == NULL) {
+    if (argument_count < 0 || argument_count % 2 != 0 || output == NULL) {
         return SQLITE_ERROR;
     }
     tokenizer = sqlite3_malloc(sizeof(*tokenizer));
     if (tokenizer == NULL) {
         return SQLITE_NOMEM;
     }
-    tokenizer->allocated = 1;
+    tokenizer->case_sensitive = 0;
+    for (index = 0; index < argument_count; index += 2) {
+        if (arguments == NULL || arguments[index] == NULL ||
+            arguments[index + 1] == NULL ||
+            strcmp(arguments[index], "case_sensitive") != 0) {
+            sqlite3_free(tokenizer);
+            return SQLITE_ERROR;
+        }
+        if (strcmp(arguments[index + 1], "0") == 0) {
+            tokenizer->case_sensitive = 0;
+        } else if (strcmp(arguments[index + 1], "1") == 0) {
+            tokenizer->case_sensitive = 1;
+        } else {
+            sqlite3_free(tokenizer);
+            return SQLITE_ERROR;
+        }
+    }
     *output = (Fts5Tokenizer *)tokenizer;
     return SQLITE_OK;
 }
@@ -86,10 +105,26 @@ static int emit_token(
     size_t position
 ) {
     Fts5Callback *callback = context;
+    unsigned char folded[8];
+    size_t folded_bytes;
+    int result;
     (void)position;
 
     if (token_bytes > INT_MAX || start > INT_MAX || end > INT_MAX) {
         return SQLITE_TOOBIG;
+    }
+    if (!callback->case_sensitive) {
+        result = unicode_lowercase_bigram(
+            token,
+            token_bytes,
+            folded,
+            &folded_bytes
+        );
+        if (result != UNICODE_BIGRAM_OK) {
+            return SQLITE_ERROR;
+        }
+        token = folded;
+        token_bytes = folded_bytes;
     }
     return callback->token(
         callback->context,
@@ -112,17 +147,19 @@ static int tokenizer_tokenize(
     int (*token)(void *, int, const char *, int, int, int)
 ) {
     Fts5Callback callback;
+    BigramTokenizer *bigram_tokenizer = (BigramTokenizer *)tokenizer;
     int result;
-    (void)tokenizer;
     (void)flags;
     (void)locale;
     (void)locale_bytes;
 
-    if (text_bytes < 0 || token == NULL || (text == NULL && text_bytes != 0)) {
+    if (bigram_tokenizer == NULL || text_bytes < 0 || token == NULL ||
+        (text == NULL && text_bytes != 0)) {
         return SQLITE_ERROR;
     }
     callback.context = context;
     callback.token = token;
+    callback.case_sensitive = bigram_tokenizer->case_sensitive;
     result = unicode_bigram_tokenize(
         (const unsigned char *)text,
         (size_t)text_bytes,

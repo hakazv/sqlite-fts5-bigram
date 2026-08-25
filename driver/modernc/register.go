@@ -17,6 +17,8 @@
 package modernc
 
 import (
+	"runtime"
+	"strings"
 	"unicode/utf8"
 	"unsafe"
 
@@ -135,17 +137,44 @@ func getFTS5API(tls *libc.TLS, db uintptr) (*sqlite3.Tfts5_api, int32) {
 
 func createTokenizer(
 	tls *libc.TLS,
-	_ /* context */, _ /* arguments */ uintptr,
+	_ /* context */, arguments uintptr,
 	argumentCount int32,
 	output uintptr,
 ) int32 {
-	if argumentCount != 0 || output == 0 {
+	if argumentCount < 0 || argumentCount%2 != 0 || output == 0 {
 		return sqliteError
+	}
+	caseSensitive := byte(0)
+	if argumentCount > 0 {
+		if arguments == 0 {
+			return sqliteError
+		}
+		pointerBytes := int(unsafe.Sizeof(uintptr(0)))
+		argumentBytes := libc.GoBytes(arguments, int(argumentCount)*pointerBytes)
+		argumentAt := func(index int) uintptr {
+			return *(*uintptr)(unsafe.Pointer(&argumentBytes[index*pointerBytes]))
+		}
+		for index := 0; index < int(argumentCount); index += 2 {
+			name := argumentAt(index)
+			value := argumentAt(index + 1)
+			if name == 0 || value == 0 || libc.GoString(name) != "case_sensitive" {
+				return sqliteError
+			}
+			switch libc.GoString(value) {
+			case "0":
+				caseSensitive = 0
+			case "1":
+				caseSensitive = 1
+			default:
+				return sqliteError
+			}
+		}
 	}
 	instance := sqlite3.Xsqlite3_malloc(tls, 1)
 	if instance == 0 {
 		return sqliteNoMem
 	}
+	libc.GoBytes(instance, 1)[0] = caseSensitive
 	**(**uintptr)(indirectPointer(output)) = instance
 	return 0
 }
@@ -156,7 +185,7 @@ func deleteTokenizer(tls *libc.TLS, tokenizer uintptr) {
 
 func tokenize(
 	tls *libc.TLS,
-	_ /* tokenizer */, context uintptr,
+	tokenizer, context uintptr,
 	_ /* flags */ int32,
 	textPointer uintptr,
 	textBytes int32,
@@ -164,7 +193,7 @@ func tokenize(
 	_ /* locale bytes */ int32,
 	tokenCallback uintptr,
 ) int32 {
-	if textBytes < 0 || tokenCallback == 0 || (textPointer == 0 && textBytes != 0) {
+	if tokenizer == 0 || textBytes < 0 || tokenCallback == 0 || (textPointer == 0 && textBytes != 0) {
 		return sqliteError
 	}
 	if textBytes == 0 {
@@ -175,7 +204,22 @@ func tokenize(
 	callback := *(*func(*libc.TLS, uintptr, int32, uintptr, int32, int32, int32) int32)(
 		unsafe.Pointer(&struct{ pointer uintptr }{tokenCallback}),
 	)
+	caseSensitive := libc.GoBytes(tokenizer, 1)[0] != 0
 	return walkBigrams(text, func(start, end int) int32 {
+		if !caseSensitive {
+			token := lowercaseBigram(text, start, end)
+			result := callback(
+				tls,
+				context,
+				0,
+				uintptr(unsafe.Pointer(unsafe.StringData(token))),
+				int32(len(token)),
+				int32(start),
+				int32(end),
+			)
+			runtime.KeepAlive(token)
+			return result
+		}
 		return callback(
 			tls,
 			context,
@@ -186,6 +230,11 @@ func tokenize(
 			int32(end),
 		)
 	})
+}
+
+func lowercaseBigram(text []byte, start, end int) string {
+	rawToken := unsafe.String(&text[start], end-start)
+	return strings.ToLower(rawToken)
 }
 
 func walkBigrams(text []byte, yield func(start, end int) int32) int32 {

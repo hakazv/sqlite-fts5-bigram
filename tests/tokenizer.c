@@ -1,4 +1,5 @@
 #include "unicode_bigram.h"
+#include "unicode_lower.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -133,6 +134,30 @@ static void test_callback_error(void) {
     assert(capture.count == 1);
 }
 
+static void expect_lowercase(const char *input, const char *expected) {
+    unsigned char output[8];
+    size_t output_bytes = 0;
+
+    assert(
+        unicode_lowercase_bigram(
+            (const unsigned char *)input,
+            strlen(input),
+            output,
+            &output_bytes
+        ) == UNICODE_BIGRAM_OK
+    );
+    assert(output_bytes == strlen(expected));
+    assert(memcmp(output, expected, output_bytes) == 0);
+}
+
+static void test_unicode_lowercase(void) {
+    expect_lowercase("AZ", "az");
+    expect_lowercase("ÄP", "äp");
+    expect_lowercase("ΑΣ", "ασ");
+    expect_lowercase("𐐀A", "𐐨a");
+    expect_lowercase("全文", "全文");
+}
+
 static unsigned char hex_digit(char value) {
     if (value >= '0' && value <= '9') {
         return (unsigned char)(value - '0');
@@ -156,6 +181,50 @@ static size_t decode_hex(const char *hex, unsigned char *output, size_t capacity
         );
     }
     return length / 2;
+}
+
+static void test_shared_casefold_corpus(const char *path) {
+    FILE *file = fopen(path, "rb");
+    char line[2048];
+
+    assert(file != NULL);
+    while (fgets(line, sizeof(line), file) != NULL) {
+        char *input_hex;
+        char *expected_hex;
+        unsigned char input[8];
+        unsigned char expected[8];
+        unsigned char actual[8];
+        size_t input_bytes;
+        size_t expected_bytes;
+        size_t actual_bytes = 0;
+
+        line[strcspn(line, "\r\n")] = '\0';
+        if (line[0] == '\0' || line[0] == '#') {
+            continue;
+        }
+        input_hex = strchr(line, '\t');
+        assert(input_hex != NULL);
+        *input_hex++ = '\0';
+        expected_hex = strchr(input_hex, '\t');
+        assert(expected_hex != NULL);
+        *expected_hex++ = '\0';
+        assert(strchr(expected_hex, '\t') == NULL);
+
+        input_bytes = decode_hex(input_hex, input, sizeof(input));
+        expected_bytes = decode_hex(expected_hex, expected, sizeof(expected));
+        assert(
+            unicode_lowercase_bigram(
+                input,
+                input_bytes,
+                actual,
+                &actual_bytes
+            ) == UNICODE_BIGRAM_OK
+        );
+        assert(actual_bytes == expected_bytes);
+        assert(memcmp(actual, expected, actual_bytes) == 0);
+    }
+    assert(ferror(file) == 0);
+    assert(fclose(file) == 0);
 }
 
 static void test_shared_corpus(const char *path) {
@@ -226,12 +295,14 @@ static void test_shared_corpus(const char *path) {
 }
 
 int main(int argument_count, char **arguments) {
-    assert(argument_count == 2);
+    assert(argument_count == 3);
     test_lengths_and_scripts();
     test_code_point_boundaries();
     test_embedded_nul();
     test_invalid_utf8();
     test_callback_error();
+    test_unicode_lowercase();
     test_shared_corpus(arguments[1]);
+    test_shared_casefold_corpus(arguments[2]);
     return 0;
 }

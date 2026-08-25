@@ -19,7 +19,7 @@ var (
 )
 
 // PhraseQuery returns text as an escaped FTS5 phrase suitable for binding to a
-// MATCH parameter. The tokenizer does not normalize or fold case.
+// MATCH parameter.
 func PhraseQuery(text string) (string, error) {
 	if !utf8.ValidString(text) {
 		return "", ErrInvalidUTF8

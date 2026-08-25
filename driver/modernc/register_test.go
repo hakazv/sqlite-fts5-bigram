@@ -34,7 +34,7 @@ func TestUnicodeBigramIsRegisteredOnEveryModerncConnection(t *testing.T) {
 		}{
 			{query: "設計", want: 1},
 			{query: "ÄPFEL", want: 1},
-			{query: "äpfel", want: 0},
+			{query: "äpfel", want: 1},
 			{query: `a"b`, want: 1},
 		} {
 			query, err := fts5bigram.PhraseQuery(testCase.query)
@@ -57,6 +57,49 @@ func TestUnicodeBigramIsRegisteredOnEveryModerncConnection(t *testing.T) {
 		}
 		if err := db.Close(); err != nil {
 			t.Fatal(err)
+		}
+	}
+}
+
+func TestTokenizerOptions(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	if _, err := db.Exec(`
+		CREATE VIRTUAL TABLE sensitive USING fts5(
+			text, tokenize='unicode_bigram case_sensitive 1'
+		);
+		INSERT INTO sensitive(text) VALUES ('ÄPFEL');
+	`); err != nil {
+		t.Fatal(err)
+	}
+	query, err := fts5bigram.PhraseQuery("äpfel")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	if err := db.QueryRow(
+		"SELECT count(*) FROM sensitive WHERE sensitive MATCH ?",
+		query,
+	).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatalf("case-sensitive query matched %d rows, want 0", count)
+	}
+
+	for _, specification := range []string{
+		"unicode_bigram case_sensitive",
+		"unicode_bigram case_sensitive 2",
+		"unicode_bigram unexpected 1",
+	} {
+		if _, err := db.Exec(
+			"CREATE VIRTUAL TABLE invalid USING fts5(text, tokenize = '" + specification + "')",
+		); err == nil {
+			t.Fatalf("tokenize=%q succeeded, want error", specification)
 		}
 	}
 }
@@ -130,6 +173,44 @@ func TestTokenizerMatchesSharedCorpus(t *testing.T) {
 				if !bytes.Equal(actual[index], expected[index]) {
 					t.Fatalf("token %d = %x, want %x", index, actual[index], expected[index])
 				}
+			}
+		})
+	}
+	if err := scanner.Err(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCaseFoldingMatchesSharedCorpus(t *testing.T) {
+	corpusPath := filepath.Join("..", "..", "tests", "casefold-corpus.tsv")
+	file, err := os.Open(corpusPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		fields := strings.Split(line, "\t")
+		if len(fields) != 3 {
+			t.Fatalf("invalid corpus line %q", line)
+		}
+		name, inputHex, expectedHex := fields[0], fields[1], fields[2]
+		t.Run(name, func(t *testing.T) {
+			input, err := hex.DecodeString(inputHex)
+			if err != nil {
+				t.Fatal(err)
+			}
+			expected, err := hex.DecodeString(expectedHex)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if actual := []byte(lowercaseBigram(input, 0, len(input))); !bytes.Equal(actual, expected) {
+				t.Fatalf("lowercase = %x, want %x", actual, expected)
 			}
 		})
 	}
