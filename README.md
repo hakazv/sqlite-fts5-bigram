@@ -52,6 +52,29 @@ sqlite-fts5-bigram = {
 }
 ```
 
+For local development, use a GitHub account that can read this repository and
+confirm that SSH authentication works before running Cargo:
+
+```sh
+ssh -T git@github.com
+cargo fetch
+```
+
+For GitHub Actions in another private repository, add a read-only deploy key to
+`sqlite-fts5-bigram`, store its private half as a secret in the consuming
+repository, and start an SSH agent before any Cargo command:
+
+```yaml
+- uses: actions/checkout@v4
+- uses: webfactory/ssh-agent@v0.9.1
+  with:
+    ssh-private-key: ${{ secrets.SQLITE_FTS5_BIGRAM_DEPLOY_KEY }}
+- run: cargo test
+```
+
+Do not commit the private key or print it in workflow logs. GitHub's default
+`GITHUB_TOKEN` does not grant access to a different private repository.
+
 Register the tokenizer once on every connection, before creating or accessing
 an FTS5 table that names it:
 
