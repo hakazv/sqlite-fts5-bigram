@@ -12,11 +12,11 @@ set(BIGRAM_SOURCES
 
 add_library(fts5_bigram_static STATIC ${BIGRAM_SOURCES})
 target_compile_definitions(fts5_bigram_static PRIVATE SQLITE_CORE)
-target_include_directories(fts5_bigram_static PRIVATE csrc include vendor)
+target_include_directories(fts5_bigram_static PRIVATE csrc include third_party/sqlite)
 set_target_properties(fts5_bigram_static PROPERTIES OUTPUT_NAME fts5_bigram)
 
 add_library(fts5_bigram MODULE ${BIGRAM_SOURCES})
-target_include_directories(fts5_bigram PRIVATE csrc include vendor)
+target_include_directories(fts5_bigram PRIVATE csrc include third_party/sqlite)
 set_target_properties(fts5_bigram PROPERTIES PREFIX "")
 if(APPLE)
     set_target_properties(fts5_bigram PROPERTIES SUFFIX ".dylib")
@@ -29,4 +29,3 @@ if(BUILD_TESTING)
     target_include_directories(tokenizer_test PRIVATE csrc)
     add_test(NAME tokenizer_core COMMAND tokenizer_test)
 endif()
-

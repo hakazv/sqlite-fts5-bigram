@@ -13,6 +13,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -36,4 +40,7 @@ jobs:
           echo "FTS5_BIGRAM_EXTENSION=$extension" >> "$GITHUB_ENV"
       - name: Test loadable extension and derived entry point
         run: cargo test --test loadable
-
+      - name: Vet Go adapter
+        run: go vet ./...
+      - name: Test Go adapter
+        run: go test ./...

@@ -4,7 +4,7 @@ fn main() {
         "csrc/unicode_bigram.c",
         "csrc/unicode_bigram.h",
         "include/sqlite3_fts5_bigram.h",
-        "vendor/sqlite3.h",
+        "third_party/sqlite/sqlite3.h",
     ] {
         println!("cargo:rerun-if-changed={path}");
     }
@@ -14,7 +14,7 @@ fn main() {
         .file("csrc/unicode_bigram.c")
         .include("csrc")
         .include("include")
-        .include("vendor")
+        .include("third_party/sqlite")
         .define("SQLITE_CORE", None)
         .warnings(true)
         .compile("fts5_bigram");
