@@ -51,7 +51,7 @@ sqlite-fts5-bigram = {
 ```
 
 The public HTTPS URL works locally and in CI without a deploy key, access token,
-or SSH agent.
+or SSH agent. SSH clone URLs are also supported for consumers that prefer them.
 
 Register the tokenizer once on every connection, before creating or accessing
 an FTS5 table that names it:
