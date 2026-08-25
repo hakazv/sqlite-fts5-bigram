@@ -60,6 +60,9 @@ db, err := sql.Open("sqlite", "search.db")
 query, err := fts5bigram.PhraseQuery("全文検索")
 ```
 
+See the [Go integration test](driver/modernc/register_test.go) for table setup,
+parameter binding, and querying.
+
 ## Rust
 
 Add the Git dependency:
@@ -87,6 +90,9 @@ unsafe {
 let query = sqlite_fts5_bigram::phrase_query("全文検索")?;
 ```
 
+See the [Rust integration test](tests/sqlite.rs) for registration, table setup,
+parameter binding, and querying.
+
 ## C and C++
 
 Build and link `fts5_bigram_static` with the application's SQLite library:
@@ -111,6 +117,9 @@ if (result != SQLITE_OK) {
     return result;
 }
 ```
+
+See the installed-package consumer tests for [C](tests/cmake-package/consumer.c)
+and [C++](tests/cmake-package/consumer.cpp).
 
 Registration is connection-local. The caller releases a non-NULL error message
 with `sqlite3_free()`.
