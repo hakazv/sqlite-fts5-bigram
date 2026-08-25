@@ -1,0 +1,70 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            library: fts5_bigram.so
+          - os: macos-latest
+            library: fts5_bigram.dylib
+          - os: windows-latest
+            library: fts5_bigram.dll
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build --config Release
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+      - name: Collect loadable extension
+        shell: bash
+        run: |
+          mkdir dist
+          library="$(find build -type f -name '${{ matrix.library }}' | head -n 1)"
+          test -n "$library"
+          cp "$library" "dist/${{ matrix.library }}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ runner.os }}
+          path: dist/${{ matrix.library }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          path: release
+          merge-multiple: true
+      - name: Create checksums
+        working-directory: release
+        run: sha256sum fts5_bigram.so fts5_bigram.dylib fts5_bigram.dll > SHA256SUMS
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            release/fts5_bigram.so \
+            release/fts5_bigram.dylib \
+            release/fts5_bigram.dll \
+            release/SHA256SUMS \
+            --verify-tag \
+            --generate-notes \
+            --title "$GITHUB_REF_NAME"

@@ -30,6 +30,12 @@ jobs:
         run: cmake -S . -B build
       - name: Build static and loadable libraries
         run: cmake --build build --config Release
+      - name: Install CMake package
+        run: cmake --install build --config Release --prefix install
+      - name: Configure CMake package consumer
+        run: cmake -S tests/cmake-package -B build-package-test -DCMAKE_PREFIX_PATH=${{ github.workspace }}/install
+      - name: Build CMake package consumer
+        run: cmake --build build-package-test --config Release
       - name: Test the C core
         run: ctest --test-dir build -C Release --output-on-failure
       - name: Locate loadable extension
