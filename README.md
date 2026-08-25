@@ -39,41 +39,19 @@ The Cargo crate compiles the C sources with `SQLITE_CORE`. It does not link its
 own SQLite, so registration uses the SQLite connection already owned by the
 application.
 
-This repository is private. The developer machine and CI runner must have
-read-only SSH access to GitHub before Cargo resolves the dependency. Pin a
-reviewed commit:
+Add the public Git dependency over HTTPS and pin a reviewed commit:
 
 ```toml
 [dependencies]
 rusqlite = { version = "0.40.2", features = ["bundled"] }
 sqlite-fts5-bigram = {
-  git = "ssh://git@github.com/hakazv/sqlite-fts5-bigram.git",
+  git = "https://github.com/hakazv/sqlite-fts5-bigram.git",
   rev = "8805349f77d379267840d4e4d86dc0cb63350e0e"
 }
 ```
 
-For local development, use a GitHub account that can read this repository and
-confirm that SSH authentication works before running Cargo:
-
-```sh
-ssh -T git@github.com
-cargo fetch
-```
-
-For GitHub Actions in another private repository, add a read-only deploy key to
-`sqlite-fts5-bigram`, store its private half as a secret in the consuming
-repository, and start an SSH agent before any Cargo command:
-
-```yaml
-- uses: actions/checkout@v4
-- uses: webfactory/ssh-agent@v0.9.1
-  with:
-    ssh-private-key: ${{ secrets.SQLITE_FTS5_BIGRAM_DEPLOY_KEY }}
-- run: cargo test
-```
-
-Do not commit the private key or print it in workflow logs. GitHub's default
-`GITHUB_TOKEN` does not grant access to a different private repository.
+The public HTTPS URL works locally and in CI without a deploy key, access token,
+or SSH agent.
 
 Register the tokenizer once on every connection, before creating or accessing
 an FTS5 table that names it:
