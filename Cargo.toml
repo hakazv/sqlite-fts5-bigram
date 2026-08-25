@@ -1,0 +1,15 @@
+[package]
+name = "sqlite-fts5-bigram"
+version = "0.1.0"
+edition = "2021"
+description = "A Unicode code-point bigram tokenizer for SQLite FTS5"
+repository = "https://github.com/hakazv/sqlite-fts5-bigram"
+publish = false
+links = "fts5_bigram"
+
+[build-dependencies]
+cc = "1"
+
+[dev-dependencies]
+rusqlite = { version = "0.40.2", features = ["bundled", "load_extension"] }
+

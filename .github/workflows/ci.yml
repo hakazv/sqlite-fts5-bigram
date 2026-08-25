@@ -1,0 +1,39 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Check Rust formatting
+        run: cargo fmt --check
+      - name: Lint
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Test static registration
+        run: cargo test --test sqlite
+      - name: Configure CMake
+        run: cmake -S . -B build
+      - name: Build static and loadable libraries
+        run: cmake --build build --config Release
+      - name: Test the C core
+        run: ctest --test-dir build -C Release --output-on-failure
+      - name: Locate loadable extension
+        shell: bash
+        run: |
+          extension="$(find build -type f \( -name 'fts5_bigram.so' -o -name 'fts5_bigram.dylib' -o -name 'fts5_bigram.dll' \) | head -n 1)"
+          test -n "$extension"
+          echo "FTS5_BIGRAM_EXTENSION=$extension" >> "$GITHUB_ENV"
+      - name: Test loadable extension and derived entry point
+        run: cargo test --test loadable
+
