@@ -101,6 +101,7 @@ Installed projects can use `find_package(sqlite_fts5_bigram CONFIG REQUIRED)`
 and link `sqlite_fts5_bigram::static` together with SQLite.
 
 ```c
+#include <sqlite3.h>
 #include "sqlite3_fts5_bigram.h"
 
 char *message = NULL;
@@ -125,7 +126,8 @@ The CMake build also creates `fts5_bigram.so`, `fts5_bigram.dylib`, or
 ```
 
 Applications should enable extension loading only for the load operation.
-Tagged GitHub Releases include `.so`, `.dylib`, `.dll`, and SHA-256 checksums.
+Tagged GitHub Releases include x86-64 `.so` and `.dll`, a universal macOS
+`.dylib`, and SHA-256 checksums.
 
 ## Development
 

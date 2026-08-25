@@ -9,7 +9,21 @@ permissions:
   contents: read
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Validate release version
+        shell: bash
+        run: |
+          cargo_version="$(sed -n 's/^version = "\([^"]*\)"$/\1/p' Cargo.toml | head -n 1)"
+          cmake_version="$(sed -n 's/^project(sqlite_fts5_bigram VERSION \([^ ]*\) LANGUAGES C)$/\1/p' CMakeLists.txt)"
+          test -n "$cargo_version"
+          test "$cargo_version" = "$cmake_version"
+          test "$GITHUB_REF_NAME" = "v$cargo_version"
+
   build:
+    needs: validate
     strategy:
       fail-fast: false
       matrix:
@@ -23,8 +37,15 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+        shell: bash
+        run: |
+          arguments=(-S . -B build -DCMAKE_BUILD_TYPE=Release)
+          if [[ "$RUNNER_OS" == macOS ]]; then
+            arguments+=('-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64')
+          fi
+          cmake "${arguments[@]}"
       - name: Build
         run: cmake --build build --config Release
       - name: Test
@@ -36,6 +57,12 @@ jobs:
           library="$(find build -type f -name '${{ matrix.library }}' | head -n 1)"
           test -n "$library"
           cp "$library" "dist/${{ matrix.library }}"
+          echo "FTS5_BIGRAM_EXTENSION=$PWD/dist/${{ matrix.library }}" >> "$GITHUB_ENV"
+      - name: Verify universal macOS binary
+        if: runner.os == 'macOS'
+        run: lipo -verify_arch arm64 x86_64 dist/${{ matrix.library }}
+      - name: Test loadable extension
+        run: cargo test --test loadable
       - uses: actions/upload-artifact@v7
         with:
           name: release-${{ runner.os }}
@@ -56,15 +83,27 @@ jobs:
       - name: Create checksums
         working-directory: release
         run: sha256sum fts5_bigram.so fts5_bigram.dylib fts5_bigram.dll > SHA256SUMS
-      - name: Create GitHub Release
+      - name: Create or resume draft release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            test "$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft)" = true
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              --draft \
+              --verify-tag \
+              --generate-notes \
+              --title "$GITHUB_REF_NAME"
+          fi
+      - name: Upload assets and publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$GITHUB_REF_NAME" \
             release/fts5_bigram.so \
             release/fts5_bigram.dylib \
             release/fts5_bigram.dll \
             release/SHA256SUMS \
-            --verify-tag \
-            --generate-notes \
-            --title "$GITHUB_REF_NAME"
+            --clobber
+          gh release edit "$GITHUB_REF_NAME" --draft=false
