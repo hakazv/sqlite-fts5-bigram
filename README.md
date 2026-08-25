@@ -65,6 +65,8 @@ rusqlite = { version = "0.40.2", features = ["bundled"] }
 sqlite-fts5-bigram = { git = "https://github.com/hakazv/sqlite-fts5-bigram.git" }
 ```
 
+SSH is also supported: `ssh://git@github.com/hakazv/sqlite-fts5-bigram.git`.
+
 Register the tokenizer once per connection before using the FTS5 table:
 
 ```rust
