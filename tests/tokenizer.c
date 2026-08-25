@@ -1,7 +1,9 @@
 #include "unicode_bigram.h"
 
 #include <assert.h>
+#include <stdio.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include <string.h>
 
 typedef struct Capture {
@@ -131,12 +133,105 @@ static void test_callback_error(void) {
     assert(capture.count == 1);
 }
 
-int main(void) {
+static unsigned char hex_digit(char value) {
+    if (value >= '0' && value <= '9') {
+        return (unsigned char)(value - '0');
+    }
+    if (value >= 'a' && value <= 'f') {
+        return (unsigned char)(value - 'a' + 10);
+    }
+    assert(0 && "invalid hexadecimal digit");
+    return 0;
+}
+
+static size_t decode_hex(const char *hex, unsigned char *output, size_t capacity) {
+    size_t length = strlen(hex);
+    size_t index;
+
+    assert(length % 2 == 0);
+    assert(length / 2 <= capacity);
+    for (index = 0; index < length; index += 2) {
+        output[index / 2] = (unsigned char)(
+            (hex_digit(hex[index]) << 4) | hex_digit(hex[index + 1])
+        );
+    }
+    return length / 2;
+}
+
+static void test_shared_corpus(const char *path) {
+    FILE *file = fopen(path, "rb");
+    char line[2048];
+
+    assert(file != NULL);
+    while (fgets(line, sizeof(line), file) != NULL) {
+        char *input_hex;
+        char *expected_result;
+        char *token_hexes;
+        unsigned char input[512];
+        size_t input_bytes;
+        Capture capture = {{0}, {0}, {0}, {0}, 0, (size_t)-1, 0};
+        int result;
+        size_t expected_count = 0;
+
+        line[strcspn(line, "\r\n")] = '\0';
+        if (line[0] == '\0' || line[0] == '#') {
+            continue;
+        }
+        input_hex = strchr(line, '\t');
+        assert(input_hex != NULL);
+        *input_hex++ = '\0';
+        expected_result = strchr(input_hex, '\t');
+        assert(expected_result != NULL);
+        *expected_result++ = '\0';
+        token_hexes = strchr(expected_result, '\t');
+        if (token_hexes == NULL) {
+            token_hexes = expected_result + strlen(expected_result);
+        } else {
+            *token_hexes++ = '\0';
+            assert(strchr(token_hexes, '\t') == NULL);
+        }
+
+        input_bytes = decode_hex(input_hex, input, sizeof(input));
+        result = unicode_bigram_tokenize(input, input_bytes, capture_token, &capture);
+        if (strcmp(expected_result, "invalid_utf8") == 0) {
+            assert(result == UNICODE_BIGRAM_INVALID_UTF8);
+            assert(capture.count == 0);
+            continue;
+        }
+        assert(strcmp(expected_result, "ok") == 0);
+        assert(result == UNICODE_BIGRAM_OK);
+
+        while (*token_hexes != '\0') {
+            char *separator = strchr(token_hexes, ',');
+            unsigned char expected[512];
+            size_t expected_bytes;
+
+            if (separator != NULL) {
+                *separator = '\0';
+            }
+            expected_bytes = decode_hex(token_hexes, expected, sizeof(expected));
+            assert(expected_count < capture.count);
+            assert(capture.token_bytes[expected_count] == expected_bytes);
+            assert(memcmp(capture.tokens[expected_count], expected, expected_bytes) == 0);
+            expected_count += 1;
+            if (separator == NULL) {
+                break;
+            }
+            token_hexes = separator + 1;
+        }
+        assert(capture.count == expected_count);
+    }
+    assert(ferror(file) == 0);
+    assert(fclose(file) == 0);
+}
+
+int main(int argument_count, char **arguments) {
+    assert(argument_count == 2);
     test_lengths_and_scripts();
     test_code_point_boundaries();
     test_embedded_nul();
     test_invalid_utf8();
     test_callback_error();
+    test_shared_corpus(arguments[1]);
     return 0;
 }
-

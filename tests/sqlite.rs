@@ -31,7 +31,8 @@ fn tokenizes_documents_and_queries_as_adjacent_bigrams() {
              INSERT INTO passages(text) VALUES
                 ('全文検索を設計する'),
                 ('全文で別の検査をしてから検索する'),
-                ('検索全文');",
+                ('検索全文'),
+                ('a\"b');",
         )
         .unwrap();
 
@@ -47,16 +48,29 @@ fn tokenizes_documents_and_queries_as_adjacent_bigrams() {
         ("設計", vec!["全文検索を設計する"]),
         ("全文検索", vec!["全文検索を設計する"]),
         ("検索全文", vec!["検索全文"]),
+        ("a\"b", vec!["a\"b"]),
     ] {
         let mut statement = connection
             .prepare("SELECT text FROM passages WHERE passages MATCH ?1 ORDER BY rowid")
             .unwrap();
         let actual = statement
-            .query_map([format!("\"{query}\"")], |row| row.get::<_, String>(0))
+            .query_map([sqlite_fts5_bigram::phrase_query(query).unwrap()], |row| {
+                row.get::<_, String>(0)
+            })
             .unwrap()
             .collect::<rusqlite::Result<Vec<_>>>()
             .unwrap();
         assert_eq!(actual, expected);
+    }
+}
+
+#[test]
+fn phrase_query_rejects_text_that_cannot_produce_a_bigram() {
+    for text in ["", "検"] {
+        assert_eq!(
+            sqlite_fts5_bigram::phrase_query(text),
+            Err(sqlite_fts5_bigram::PhraseQueryError::TooShort)
+        );
     }
 }
 
@@ -125,7 +139,7 @@ fn match_count(connection: &Connection, query: &str) -> i64 {
     connection
         .query_row(
             "SELECT count(*) FROM passages_fts WHERE passages_fts MATCH ?1",
-            params![format!("\"{query}\"")],
+            params![sqlite_fts5_bigram::phrase_query(query).unwrap()],
             |row| row.get(0),
         )
         .unwrap()

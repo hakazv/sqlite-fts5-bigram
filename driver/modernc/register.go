@@ -20,12 +20,13 @@ import (
 	"unicode/utf8"
 	"unsafe"
 
+	fts5bigram "github.com/hakazv/sqlite-fts5-bigram"
 	"modernc.org/libc"
 	sqlite3 "modernc.org/sqlite/lib"
 )
 
 // TokenizerName is the name accepted by FTS5's tokenize option.
-const TokenizerName = "unicode_bigram"
+const TokenizerName = fts5bigram.TokenizerName
 
 const (
 	sqliteError  = int32(1)
@@ -171,28 +172,36 @@ func tokenize(
 	}
 
 	text := libc.GoBytes(textPointer, int(textBytes))
-	if !utf8.Valid(text) {
-		return sqliteError
-	}
 	callback := *(*func(*libc.TLS, uintptr, int32, uintptr, int32, int32, int32) int32)(
 		unsafe.Pointer(&struct{ pointer uintptr }{tokenCallback}),
 	)
+	return walkBigrams(text, func(start, end int) int32 {
+		return callback(
+			tls,
+			context,
+			0,
+			textPointer+uintptr(start),
+			int32(end-start),
+			int32(start),
+			int32(end),
+		)
+	})
+}
 
+func walkBigrams(text []byte, yield func(start, end int) int32) int32 {
+	if !utf8.Valid(text) {
+		return sqliteError
+	}
+	if len(text) == 0 {
+		return 0
+	}
 	firstStart := 0
 	_, firstBytes := utf8.DecodeRune(text)
 	nextStart := firstBytes
 	for nextStart < len(text) {
 		_, secondBytes := utf8.DecodeRune(text[nextStart:])
 		end := nextStart + secondBytes
-		result := callback(
-			tls,
-			context,
-			0,
-			textPointer+uintptr(firstStart),
-			int32(end-firstStart),
-			int32(firstStart),
-			int32(end),
-		)
+		result := yield(firstStart, end)
 		if result != 0 {
 			return result
 		}

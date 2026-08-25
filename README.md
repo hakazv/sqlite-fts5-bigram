@@ -33,6 +33,9 @@ FROM passages
 WHERE passages MATCH 'text : "全文検索"';
 ```
 
+Bind application input with `PhraseQuery` (Go) or `phrase_query` (Rust) to
+escape an FTS5 phrase and reject input too short to produce a bigram.
+
 ## Go with modernc.org/sqlite
 
 The Go adapter is CGO-free and registers the tokenizer on every new
@@ -48,11 +51,13 @@ Import the adapter for its side effect before opening connections:
 import (
     "database/sql"
 
+    fts5bigram "github.com/hakazv/sqlite-fts5-bigram"
     _ "github.com/hakazv/sqlite-fts5-bigram/driver/modernc"
     _ "modernc.org/sqlite"
 )
 
 db, err := sql.Open("sqlite", "search.db")
+query, err := fts5bigram.PhraseQuery("全文検索")
 ```
 
 ## Rust
@@ -78,6 +83,8 @@ let connection = Connection::open("search.db")?;
 unsafe {
     sqlite_fts5_bigram::register(connection.handle().cast())?;
 }
+
+let query = sqlite_fts5_bigram::phrase_query("全文検索")?;
 ```
 
 ## C and C++
@@ -87,7 +94,11 @@ Build and link `fts5_bigram_static` with the application's SQLite library:
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
+cmake --install build --prefix install
 ```
+
+Installed projects can use `find_package(sqlite_fts5_bigram CONFIG REQUIRED)`
+and link `sqlite_fts5_bigram::static` together with SQLite.
 
 ```c
 #include "sqlite3_fts5_bigram.h"
@@ -114,6 +125,7 @@ The CMake build also creates `fts5_bigram.so`, `fts5_bigram.dylib`, or
 ```
 
 Applications should enable extension loading only for the load operation.
+Tagged GitHub Releases include `.so`, `.dylib`, `.dll`, and SHA-256 checksums.
 
 ## Development
 

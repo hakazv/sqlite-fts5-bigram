@@ -1,3 +1,4 @@
+#include "sqlite3.h"
 #include "sqlite3_fts5_bigram.h"
 #include "unicode_bigram.h"
 
@@ -189,4 +190,3 @@ int sqlite3_fts5bigram_init(
 #endif
     return sqlite3_fts5bigram_register(db, error);
 }
-
