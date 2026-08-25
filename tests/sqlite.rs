@@ -75,6 +75,11 @@ fn external_content_triggers_and_rebuild_stay_in_sync() {
              CREATE TRIGGER passages_ad AFTER DELETE ON passages BEGIN
                 INSERT INTO passages_fts(passages_fts, rowid, text)
                 VALUES ('delete', old.id, old.text);
+             END;
+             CREATE TRIGGER passages_au AFTER UPDATE ON passages BEGIN
+                INSERT INTO passages_fts(passages_fts, rowid, text)
+                VALUES ('delete', old.id, old.text);
+                INSERT INTO passages_fts(rowid, text) VALUES (new.id, new.text);
              END;",
         )
         .unwrap();
@@ -83,9 +88,14 @@ fn external_content_triggers_and_rebuild_stay_in_sync() {
         .unwrap();
     assert_eq!(match_count(&connection, "検索"), 1);
     connection
-        .execute("DELETE FROM passages WHERE id = 1", [])
+        .execute("UPDATE passages SET text = ?1 WHERE id = 1", ["再設計"])
         .unwrap();
     assert_eq!(match_count(&connection, "検索"), 0);
+    assert_eq!(match_count(&connection, "設計"), 1);
+    connection
+        .execute("DELETE FROM passages WHERE id = 1", [])
+        .unwrap();
+    assert_eq!(match_count(&connection, "設計"), 0);
     connection
         .execute("INSERT INTO passages(text) VALUES (?1)", ["再設計"])
         .unwrap();
