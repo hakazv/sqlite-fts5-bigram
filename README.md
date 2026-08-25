@@ -39,7 +39,9 @@ The Cargo crate compiles the C sources with `SQLITE_CORE`. It does not link its
 own SQLite, so registration uses the SQLite connection already owned by the
 application.
 
-Add the public Git dependency over HTTPS and pin a reviewed commit:
+Add the public Git dependency and pin a reviewed commit. Both HTTPS and SSH
+transports are supported; the example uses HTTPS because it works without
+GitHub authentication and is the usual choice for a public dependency:
 
 ```toml
 [dependencies]
@@ -50,8 +52,13 @@ sqlite-fts5-bigram = {
 }
 ```
 
-The public HTTPS URL works locally and in CI without a deploy key, access token,
-or SSH agent. SSH clone URLs are also supported for consumers that prefer them.
+Available Git URLs:
+
+- HTTPS: `https://github.com/hakazv/sqlite-fts5-bigram.git`
+- SSH: `ssh://git@github.com/hakazv/sqlite-fts5-bigram.git`
+
+Use the SSH URL when the consuming project intentionally standardizes on SSH;
+GitHub SSH authentication must then be available locally and in CI.
 
 Register the tokenizer once on every connection, before creating or accessing
 an FTS5 table that names it:
