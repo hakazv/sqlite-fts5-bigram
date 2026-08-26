@@ -6,6 +6,9 @@ fn main() {
         "csrc/unicode_lower.c",
         "csrc/unicode_lower.h",
         "csrc/unicode_lower_table.inc",
+        "csrc/unicode_norm.c",
+        "csrc/unicode_norm.h",
+        "third_party/utf8proc/utf8proc.c",
         "include/sqlite3_fts5_bigram.h",
         "third_party/sqlite/sqlite3.h",
     ] {
@@ -16,10 +19,14 @@ fn main() {
         .file("csrc/fts5_bigram.c")
         .file("csrc/unicode_bigram.c")
         .file("csrc/unicode_lower.c")
+        .file("csrc/unicode_norm.c")
+        .file("third_party/utf8proc/utf8proc.c")
         .include("csrc")
+        .include("third_party/utf8proc")
         .include("include")
         .include("third_party/sqlite")
         .define("SQLITE_CORE", None)
+        .define("UTF8PROC_STATIC", None)
         .warnings(true)
         .compile("fts5_bigram");
 }

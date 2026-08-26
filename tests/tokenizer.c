@@ -1,5 +1,7 @@
 #include "unicode_bigram.h"
 #include "unicode_lower.h"
+#include "unicode_norm.h"
+#include "utf8proc.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -39,9 +41,26 @@ static int capture_token(
     return UNICODE_BIGRAM_OK;
 }
 
+/* FTS5 の glue と同じ入口を通す (正規化してから窓を切る)。 */
+static int tokenize_normalized(
+    const unsigned char *text,
+    size_t bytes,
+    unicode_bigram_callback callback,
+    void *context
+) {
+    static unsigned char scratch[4096];
+    static unsigned int starts[4097];
+    static unsigned int ends[4097];
+
+    assert(bytes < sizeof(scratch));
+    return unicode_norm_tokenize(
+        text, bytes, scratch, sizeof(scratch), starts, ends, 4097, callback, context
+    );
+}
+
 static Capture tokenize(const unsigned char *text, size_t bytes) {
     Capture capture = {{0}, {0}, {0}, {0}, 0, (size_t)-1, 0};
-    assert(unicode_bigram_tokenize(text, bytes, capture_token, &capture) == 0);
+    assert(tokenize_normalized(text, bytes, capture_token, &capture) == 0);
     return capture;
 }
 
@@ -85,7 +104,13 @@ static void test_code_point_boundaries(void) {
     assert(capture.count == 2);
     expect_token(&capture, 0, "A😀");
     expect_token(&capture, 1, "😀B");
-    assert(tokenize((const unsigned char *)combining, strlen(combining)).count == 2);
+    /* 結合文字は合成されてから窓に入る: "e + 結合アキュート + x" は "éx" の 1 トークン。 */
+    /* 結合文字は合成されてから窓に入る: "e + 結合アキュート + x" は "éx" の 1 トークン。 */
+    {
+        Capture composed = tokenize((const unsigned char *)combining, strlen(combining));
+        assert(composed.count == 1);
+        expect_token(&composed, 0, "\xc3\xa9x");
+    }
     assert(tokenize((const unsigned char *)variation, strlen(variation)).count == 2);
     assert(tokenize((const unsigned char *)zwj, strlen(zwj)).count == 2);
 }
@@ -102,7 +127,7 @@ static void test_embedded_nul(void) {
 static void expect_invalid(const unsigned char *text, size_t bytes) {
     Capture capture = {{0}, {0}, {0}, {0}, 0, (size_t)-1, 0};
     assert(
-        unicode_bigram_tokenize(text, bytes, capture_token, &capture) ==
+        tokenize_normalized(text, bytes, capture_token, &capture) ==
         UNICODE_BIGRAM_INVALID_UTF8
     );
     assert(capture.count == 0);
@@ -227,6 +252,90 @@ static void test_shared_casefold_corpus(const char *path) {
     assert(fclose(file) == 0);
 }
 
+
+/*
+ * Unicode 公式の適合性テスト。実装が 2 つある以上、両者が同じ規則に従うことは
+ * 実装同士の突き合わせではなく、仕様への適合として担保する。Go 側も同じファイルを読む
+ * (driver/modernc/normalize_conformance_test.go)。
+ */
+static size_t parse_code_points(const char *field, unsigned char *out, size_t capacity) {
+    size_t written = 0;
+    const char *cursor = field;
+
+    while (*cursor != '\0') {
+        char *end = NULL;
+        unsigned long code_point;
+        unsigned char encoded[4];
+        int encoded_bytes;
+
+        while (*cursor == ' ') cursor++;
+        if (*cursor == '\0') break;
+        code_point = strtoul(cursor, &end, 16);
+        if (end == cursor) break;
+        cursor = end;
+        encoded_bytes = (int)utf8proc_encode_char((utf8proc_int32_t)code_point, encoded);
+        assert(encoded_bytes > 0 && written + (size_t)encoded_bytes <= capacity);
+        for (int index = 0; index < encoded_bytes; index++) {
+            out[written++] = encoded[index];
+        }
+    }
+    return written;
+}
+
+static void expect_nfc(const unsigned char *source, size_t source_bytes,
+                       const unsigned char *want, size_t want_bytes) {
+    static unsigned char normalized[4096];
+    static unsigned int starts[4097];
+    static unsigned int ends[4097];
+    size_t produced = 0;
+    size_t code_points = 0;
+
+    if (unicode_norm_is_already_composed(source, source_bytes)) {
+        assert(source_bytes == want_bytes);
+        assert(memcmp(source, want, want_bytes) == 0);
+        return;
+    }
+    assert(unicode_norm_compose(source, source_bytes, normalized, sizeof(normalized),
+                                &produced, starts, ends, 4097, &code_points) == 0);
+    assert(produced == want_bytes);
+    assert(memcmp(normalized, want, want_bytes) == 0);
+}
+
+static void test_unicode_conformance(const char *path) {
+    FILE *file = fopen(path, "rb");
+    static char line[4096];
+    size_t checked = 0;
+
+    assert(file != NULL);
+    while (fgets(line, sizeof(line), file) != NULL) {
+        unsigned char sources[5][256];
+        size_t lengths[5];
+        char *comment = strchr(line, '#');
+        char *cursor = line;
+        int field_index;
+
+        if (comment != NULL) *comment = '\0';
+        if (line[0] == '@') continue;
+        if (strchr(line, ';') == NULL) continue;
+        for (field_index = 0; field_index < 5; field_index++) {
+            char *separator = strchr(cursor, ';');
+            assert(separator != NULL);
+            *separator = '\0';
+            lengths[field_index] = parse_code_points(cursor, sources[field_index], 256);
+            cursor = separator + 1;
+        }
+        /* c2 == toNFC(c1) == toNFC(c2) == toNFC(c3), c4 == toNFC(c4) == toNFC(c5) */
+        expect_nfc(sources[0], lengths[0], sources[1], lengths[1]);
+        expect_nfc(sources[1], lengths[1], sources[1], lengths[1]);
+        expect_nfc(sources[2], lengths[2], sources[1], lengths[1]);
+        expect_nfc(sources[3], lengths[3], sources[3], lengths[3]);
+        expect_nfc(sources[4], lengths[4], sources[3], lengths[3]);
+        checked += 5;
+    }
+    fclose(file);
+    assert(checked > 0);
+}
+
 static void test_shared_corpus(const char *path) {
     FILE *file = fopen(path, "rb");
     char line[2048];
@@ -261,7 +370,7 @@ static void test_shared_corpus(const char *path) {
         }
 
         input_bytes = decode_hex(input_hex, input, sizeof(input));
-        result = unicode_bigram_tokenize(input, input_bytes, capture_token, &capture);
+        result = tokenize_normalized(input, input_bytes, capture_token, &capture);
         if (strcmp(expected_result, "invalid_utf8") == 0) {
             assert(result == UNICODE_BIGRAM_INVALID_UTF8);
             assert(capture.count == 0);
@@ -295,7 +404,7 @@ static void test_shared_corpus(const char *path) {
 }
 
 int main(int argument_count, char **arguments) {
-    assert(argument_count == 3);
+    assert(argument_count == 4);
     test_lengths_and_scripts();
     test_code_point_boundaries();
     test_embedded_nul();
@@ -304,5 +413,6 @@ int main(int argument_count, char **arguments) {
     test_unicode_lowercase();
     test_shared_corpus(arguments[1]);
     test_shared_casefold_corpus(arguments[2]);
+    test_unicode_conformance(arguments[3]);
     return 0;
 }

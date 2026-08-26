@@ -15,8 +15,9 @@ Requirements:
 - Valid UTF-8 input
 
 The tokenizer uses adjacent Unicode code points and is case-insensitive by
-default. It does not perform Unicode normalization or remove diacritics, and
-inputs shorter than two code points emit no tokens.
+default. Text is composed (NFC) before it is split, so the same word matches
+whichever normalization form it is written in; diacritics are preserved, not
+removed. Inputs shorter than two code points after composing emit no tokens.
 
 Use `case_sensitive 1` for exact case matching:
 
@@ -41,6 +42,23 @@ WHERE passages MATCH 'text : "全文検索"';
 
 Bind application input with `PhraseQuery` (Go) or `phrase_query` (Rust) to
 escape an FTS5 phrase and reject input too short to produce a bigram.
+
+## Unicode normalization
+
+Text is composed (NFC) before it is split into bigrams, on both the indexing and
+the query side. A dakuten can be written as one character or as a base plus a
+combining mark; without composing first, the combining mark becomes a token unit
+of its own, so 「イド」 matches a search for 「イト」 and a composed query for
+「ガイ」 matches nothing. Files synced from macOS carry decomposed names and text.
+
+Byte offsets passed to `xToken` keep pointing into the original text, so
+`snippet()` and `highlight()` still land on the source.
+
+Conformance is checked against the Unicode Consortium's `NormalizationTest.txt`
+(`third_party/unicode/`) from both implementations — the C tokenizer, which uses
+utf8proc, and the pure-Go modernc driver, which uses golang.org/x/text. Two
+implementations of one tokenizer agree because both are held to the
+specification, not to each other.
 
 ## Go with modernc.org/sqlite
 

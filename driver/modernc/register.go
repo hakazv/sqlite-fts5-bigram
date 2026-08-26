@@ -205,52 +205,55 @@ func tokenize(
 		unsafe.Pointer(&struct{ pointer uintptr }{tokenCallback}),
 	)
 	caseSensitive := libc.GoBytes(tokenizer, 1)[0] != 0
-	return walkBigrams(text, func(start, end int) int32 {
+	return walkBigrams(text, func(token []byte, start, end int) int32 {
 		if !caseSensitive {
-			token := lowercaseBigram(text, start, end)
-			result := callback(
-				tls,
-				context,
-				0,
-				uintptr(unsafe.Pointer(unsafe.StringData(token))),
-				int32(len(token)),
-				int32(start),
-				int32(end),
-			)
-			runtime.KeepAlive(token)
-			return result
+			token = lowercaseBigram(token)
 		}
-		return callback(
+		result := callback(
 			tls,
 			context,
 			0,
-			textPointer+uintptr(start),
-			int32(end-start),
+			uintptr(unsafe.Pointer(&token[0])),
+			int32(len(token)),
 			int32(start),
 			int32(end),
 		)
+		runtime.KeepAlive(token)
+		return result
 	})
 }
 
-func lowercaseBigram(text []byte, start, end int) string {
-	rawToken := unsafe.String(&text[start], end-start)
-	return strings.ToLower(rawToken)
+func lowercaseBigram(token []byte) []byte {
+	lowered := strings.ToLower(unsafe.String(&token[0], len(token)))
+	return []byte(lowered)
 }
 
-func walkBigrams(text []byte, yield func(start, end int) int32) int32 {
+// walkBigrams は隣り合う 2 コードポイントを 1 トークンとして送る。
+//
+// token は正規化後の文字列なので、入力の部分列とは限らない。start / end は原文の
+// バイト位置で、FTS5 の snippet / highlight がそれを使う。
+func walkBigrams(text []byte, yield func(token []byte, start, end int) int32) int32 {
 	if !utf8.Valid(text) {
 		return sqliteError
 	}
 	if len(text) == 0 {
 		return 0
 	}
+	normalized := composeForTokenizing(text)
+	content := normalized.text
+	if len(content) == 0 {
+		return 0
+	}
+
 	firstStart := 0
-	_, firstBytes := utf8.DecodeRune(text)
+	_, firstBytes := utf8.DecodeRune(content)
 	nextStart := firstBytes
-	for nextStart < len(text) {
-		_, secondBytes := utf8.DecodeRune(text[nextStart:])
+	for index := 0; nextStart < len(content); index++ {
+		_, secondBytes := utf8.DecodeRune(content[nextStart:])
 		end := nextStart + secondBytes
-		result := yield(firstStart, end)
+		tokenStart, _ := normalized.codePointRange(index, firstStart, firstStart)
+		_, tokenEnd := normalized.codePointRange(index+1, end, end)
+		result := yield(content[firstStart:end], tokenStart, tokenEnd)
 		if result != 0 {
 			return result
 		}

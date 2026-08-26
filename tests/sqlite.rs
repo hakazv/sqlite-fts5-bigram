@@ -185,3 +185,42 @@ fn match_count(connection: &Connection, query: &str) -> i64 {
         )
         .unwrap()
 }
+
+/// 分解済みの本文と合成済みのクエリが、どちらの向きでも噛み合うこと。
+///
+/// 正規化を窓の前に置かないと、結合文字が独立したトークン単位になり、取りこぼし
+/// (合成済みのクエリが当たらない) と誤ヒット (濁点を落とした語で当たる) が同時に出る。
+#[test]
+fn matches_across_unicode_normalization_forms() {
+    let connection = connection();
+    // 「ガイドライン」を分解済みで格納する。
+    let decomposed = "\u{30ab}\u{3099}\u{30a4}\u{30c8}\u{3099}\u{30e9}\u{30a4}\u{30f3}";
+    connection
+        .execute_batch(
+            "CREATE VIRTUAL TABLE notes USING fts5(text, tokenize='unicode_bigram');",
+        )
+        .unwrap();
+    connection
+        .execute("INSERT INTO notes(text) VALUES (?1)", [decomposed])
+        .unwrap();
+
+    let count = |needle: &str| {
+        let query = sqlite_fts5_bigram::phrase_query(needle).unwrap();
+        connection
+            .query_row(
+                "SELECT count(*) FROM notes WHERE notes MATCH ?1",
+                [&query],
+                |row| row.get::<_, i64>(0),
+            )
+            .unwrap()
+    };
+
+    assert_eq!(count("\u{30ac}\u{30a4}"), 1, "composed query should match");
+    assert_eq!(
+        count("\u{30ab}\u{3099}\u{30a4}"),
+        1,
+        "decomposed query should match"
+    );
+    // 濁点を落とした「カイ」は別語なので当たってはいけない。
+    assert_eq!(count("\u{30ab}\u{30a4}"), 0, "dakuten must not be ignored");
+}

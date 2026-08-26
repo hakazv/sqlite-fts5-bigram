@@ -11,17 +11,20 @@ set(BIGRAM_SOURCES
     csrc/fts5_bigram.c
     csrc/unicode_bigram.c
     csrc/unicode_lower.c
+    csrc/unicode_norm.c
+    third_party/utf8proc/utf8proc.c
 )
 
 add_library(fts5_bigram_static STATIC ${BIGRAM_SOURCES})
 add_library(sqlite_fts5_bigram::static ALIAS fts5_bigram_static)
+target_compile_definitions(fts5_bigram_static PRIVATE UTF8PROC_STATIC)
 target_compile_definitions(fts5_bigram_static PRIVATE SQLITE_CORE)
 target_include_directories(
     fts5_bigram_static
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-    PRIVATE csrc third_party/sqlite
+    PRIVATE csrc third_party/sqlite third_party/utf8proc
 )
 set_target_properties(
     fts5_bigram_static
@@ -29,8 +32,9 @@ set_target_properties(
 )
 
 add_library(fts5_bigram MODULE ${BIGRAM_SOURCES})
+target_compile_definitions(fts5_bigram PRIVATE UTF8PROC_STATIC)
 target_compile_definitions(fts5_bigram PRIVATE FTS5_BIGRAM_BUILD_EXTENSION)
-target_include_directories(fts5_bigram PRIVATE csrc include third_party/sqlite)
+target_include_directories(fts5_bigram PRIVATE csrc include third_party/sqlite third_party/utf8proc)
 set_target_properties(fts5_bigram PROPERTIES PREFIX "")
 if(APPLE)
     set_target_properties(fts5_bigram PROPERTIES SUFFIX ".dylib")
@@ -85,8 +89,11 @@ if(BUILD_TESTING)
         tests/tokenizer.c
         csrc/unicode_bigram.c
         csrc/unicode_lower.c
+        csrc/unicode_norm.c
+        third_party/utf8proc/utf8proc.c
     )
-    target_include_directories(tokenizer_test PRIVATE csrc)
+    target_include_directories(tokenizer_test PRIVATE csrc third_party/utf8proc)
+    target_compile_definitions(tokenizer_test PRIVATE UTF8PROC_STATIC)
     if(MSVC)
         target_compile_options(tokenizer_test PRIVATE /UNDEBUG)
     else()
@@ -97,5 +104,6 @@ if(BUILD_TESTING)
         COMMAND tokenizer_test
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/tokenizer-corpus.tsv
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/casefold-corpus.tsv
+            ${CMAKE_CURRENT_SOURCE_DIR}/third_party/unicode/NormalizationTest.txt
     )
 endif()

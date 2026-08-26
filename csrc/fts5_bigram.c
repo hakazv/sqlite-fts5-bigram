@@ -2,6 +2,7 @@
 #include "sqlite3_fts5_bigram.h"
 #include "unicode_bigram.h"
 #include "unicode_lower.h"
+#include "unicode_norm.h"
 
 #include <limits.h>
 #include <stddef.h>
@@ -160,12 +161,48 @@ static int tokenizer_tokenize(
     callback.context = context;
     callback.token = token;
     callback.case_sensitive = bigram_tokenizer->case_sensitive;
-    result = unicode_bigram_tokenize(
-        (const unsigned char *)text,
-        (size_t)text_bytes,
-        emit_token,
-        &callback
-    );
+
+    /*
+     * 正規化は窓を切る前に要る。分解済みの「ガ」は「カ + 結合濁点」の 2 コードポイントで、
+     * コードポイントの窓は結合文字を独立した単位として切ってしまう。その結果「イド」が
+     * 「イト」で引ける誤ヒットと、合成済みのクエリでの取りこぼしが同時に起きる。
+     *
+     * 既に正規化済みの本文 (大半) では確保も複製もせずに済む。
+     */
+    if (unicode_norm_is_already_composed((const unsigned char *)text, (size_t)text_bytes)) {
+        result = unicode_bigram_tokenize(
+            (const unsigned char *)text,
+            (size_t)text_bytes,
+            emit_token,
+            &callback
+        );
+    } else {
+        size_t capacity = (size_t)text_bytes;
+        unsigned char *scratch = sqlite3_malloc64(capacity);
+        unsigned int *starts = sqlite3_malloc64(sizeof(unsigned int) * (capacity + 1));
+        unsigned int *ends = sqlite3_malloc64(sizeof(unsigned int) * (capacity + 1));
+
+        if (scratch == NULL || starts == NULL || ends == NULL) {
+            sqlite3_free(scratch);
+            sqlite3_free(starts);
+            sqlite3_free(ends);
+            return SQLITE_NOMEM;
+        }
+        result = unicode_norm_tokenize(
+            (const unsigned char *)text,
+            (size_t)text_bytes,
+            scratch,
+            capacity,
+            starts,
+            ends,
+            capacity + 1,
+            emit_token,
+            &callback
+        );
+        sqlite3_free(scratch);
+        sqlite3_free(starts);
+        sqlite3_free(ends);
+    }
     if (result == UNICODE_BIGRAM_INVALID_UTF8 || result == UNICODE_BIGRAM_RANGE) {
         return SQLITE_ERROR;
     }

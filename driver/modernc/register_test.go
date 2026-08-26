@@ -139,8 +139,9 @@ func TestTokenizerMatchesSharedCorpus(t *testing.T) {
 				t.Fatal(err)
 			}
 			var actual [][]byte
-			result := walkBigrams(input, func(start, end int) int32 {
-				actual = append(actual, bytes.Clone(input[start:end]))
+			// token は正規化後の文字列で、入力の部分列とは限らない。
+			result := walkBigrams(input, func(token []byte, _, _ int) int32 {
+				actual = append(actual, bytes.Clone(token))
 				return 0
 			})
 			if expectedResult == "invalid_utf8" {
@@ -209,7 +210,7 @@ func TestCaseFoldingMatchesSharedCorpus(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if actual := []byte(lowercaseBigram(input, 0, len(input))); !bytes.Equal(actual, expected) {
+			if actual := lowercaseBigram(input); !bytes.Equal(actual, expected) {
 				t.Fatalf("lowercase = %x, want %x", actual, expected)
 			}
 		})

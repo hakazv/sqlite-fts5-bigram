@@ -4,7 +4,7 @@ one_code_point	e6a49c	ok
 japanese	e585a8e69687e6a49ce7b4a2	ok	e585a8e69687,e69687e6a49c,e6a49ce7b4a2
 ascii	68656c6c6f	ok	6865,656c,6c6c,6c6f
 non_bmp	41f09f988042	ok	41f09f9880,f09f988042
-combining_mark	65cc8178	ok	65cc81,cc8178
+combining_mark	c3a978	ok	c3a978
 variation_selector	e8919befb880e9a3be	ok	e8919befb880,efb880e9a3be
 zero_width_joiner	f09f91a9e2808df09f92bb	ok	f09f91a9e2808d,e2808df09f92bb
 embedded_nul	610062	ok	6100,0062
@@ -14,3 +14,8 @@ overlong_utf8	c0af	invalid_utf8
 surrogate_utf8	eda080	invalid_utf8
 out_of_range_utf8	f4908080	invalid_utf8
 stray_continuation	80	invalid_utf8
+decomposed_japanese	e382abe38299e382a4e38388e38299	ok	e382ace382a4,e382a4e38389
+composed_japanese	e382ace382a4e38389	ok	e382ace382a4,e382a4e38389
+decomposed_hangul	e18492e185a1e186abe18480e185aee186a8	ok	ed959ceab5ad
+decomposed_latin	41cc8862	ok	c38462
+decomposed_single_grapheme	e382abe38299	ok
