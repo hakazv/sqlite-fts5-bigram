@@ -196,9 +196,7 @@ fn matches_across_unicode_normalization_forms() {
     // 「ガイドライン」を分解済みで格納する。
     let decomposed = "\u{30ab}\u{3099}\u{30a4}\u{30c8}\u{3099}\u{30e9}\u{30a4}\u{30f3}";
     connection
-        .execute_batch(
-            "CREATE VIRTUAL TABLE notes USING fts5(text, tokenize='unicode_bigram');",
-        )
+        .execute_batch("CREATE VIRTUAL TABLE notes USING fts5(text, tokenize='unicode_bigram');")
         .unwrap();
     connection
         .execute("INSERT INTO notes(text) VALUES (?1)", [decomposed])

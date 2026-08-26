@@ -7,16 +7,35 @@ set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
+# 自分の C。警告はここにだけ効かせる。
 set(BIGRAM_SOURCES
     csrc/fts5_bigram.c
     csrc/unicode_bigram.c
     csrc/unicode_lower.c
     csrc/unicode_norm.c
-    third_party/utf8proc/utf8proc.c
+    csrc/unicode_bigram_composed.c
 )
 
-add_library(fts5_bigram_static STATIC ${BIGRAM_SOURCES})
+# vendoring した utf8proc は object library に分け、こちらの警告設定から外す。
+# 手を入れないコードに警告を出しても直せず、自分の警告が埋もれるだけになる。
+# object を $<TARGET_OBJECTS:> で埋め込むだけなので link はしない。link すると
+# install(EXPORT) がこの内部ターゲットまで export set に要求してくる。
+add_library(bigram_utf8proc OBJECT third_party/utf8proc/utf8proc.c)
+target_compile_definitions(bigram_utf8proc PRIVATE UTF8PROC_STATIC)
+target_include_directories(bigram_utf8proc PRIVATE third_party/utf8proc)
+set_target_properties(bigram_utf8proc PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+# cc crate の warnings(true) と同じ水準を CMake 側でも掛ける。警告のまま止めないのは、
+# 新しいコンパイラで利用者のビルドが落ちるのを避けるため (CI では出力に残る)。
+if(MSVC)
+    set(BIGRAM_WARNINGS /W4)
+else()
+    set(BIGRAM_WARNINGS -Wall -Wextra)
+endif()
+
+add_library(fts5_bigram_static STATIC ${BIGRAM_SOURCES} $<TARGET_OBJECTS:bigram_utf8proc>)
 add_library(sqlite_fts5_bigram::static ALIAS fts5_bigram_static)
+target_compile_options(fts5_bigram_static PRIVATE ${BIGRAM_WARNINGS})
 target_compile_definitions(fts5_bigram_static PRIVATE UTF8PROC_STATIC)
 target_compile_definitions(fts5_bigram_static PRIVATE SQLITE_CORE)
 target_include_directories(
@@ -31,7 +50,8 @@ set_target_properties(
     PROPERTIES EXPORT_NAME static OUTPUT_NAME fts5_bigram
 )
 
-add_library(fts5_bigram MODULE ${BIGRAM_SOURCES})
+add_library(fts5_bigram MODULE ${BIGRAM_SOURCES} $<TARGET_OBJECTS:bigram_utf8proc>)
+target_compile_options(fts5_bigram PRIVATE ${BIGRAM_WARNINGS})
 target_compile_definitions(fts5_bigram PRIVATE UTF8PROC_STATIC)
 target_compile_definitions(fts5_bigram PRIVATE FTS5_BIGRAM_BUILD_EXTENSION)
 target_include_directories(fts5_bigram PRIVATE csrc include third_party/sqlite third_party/utf8proc)
@@ -90,10 +110,12 @@ if(BUILD_TESTING)
         csrc/unicode_bigram.c
         csrc/unicode_lower.c
         csrc/unicode_norm.c
-        third_party/utf8proc/utf8proc.c
+        csrc/unicode_bigram_composed.c
+        $<TARGET_OBJECTS:bigram_utf8proc>
     )
     target_include_directories(tokenizer_test PRIVATE csrc third_party/utf8proc)
     target_compile_definitions(tokenizer_test PRIVATE UTF8PROC_STATIC)
+    target_compile_options(tokenizer_test PRIVATE ${BIGRAM_WARNINGS})
     if(MSVC)
         target_compile_options(tokenizer_test PRIVATE /UNDEBUG)
     else()

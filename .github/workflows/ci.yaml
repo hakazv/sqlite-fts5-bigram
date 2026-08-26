@@ -46,6 +46,14 @@ jobs:
           echo "FTS5_BIGRAM_EXTENSION=$extension" >> "$GITHUB_ENV"
       - name: Test loadable extension and derived entry point
         run: cargo test --test loadable
+      - name: Check Go formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "gofmt needed for:"
+            echo "$unformatted"
+            exit 1
+          fi
       - name: Vet Go adapter
         run: go vet ./...
       - name: Test Go adapter

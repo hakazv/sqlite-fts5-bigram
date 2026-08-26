@@ -2,6 +2,7 @@
 #include "sqlite3_fts5_bigram.h"
 #include "unicode_bigram.h"
 #include "unicode_lower.h"
+#include "unicode_bigram_composed.h"
 #include "unicode_norm.h"
 
 #include <limits.h>
@@ -188,7 +189,7 @@ static int tokenizer_tokenize(
             sqlite3_free(ends);
             return SQLITE_NOMEM;
         }
-        result = unicode_norm_tokenize(
+        result = unicode_bigram_tokenize_composed(
             (const unsigned char *)text,
             (size_t)text_bytes,
             scratch,

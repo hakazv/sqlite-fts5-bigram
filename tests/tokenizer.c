@@ -1,5 +1,6 @@
 #include "unicode_bigram.h"
 #include "unicode_lower.h"
+#include "unicode_bigram_composed.h"
 #include "unicode_norm.h"
 #include "utf8proc.h"
 
@@ -53,7 +54,7 @@ static int tokenize_normalized(
     static unsigned int ends[4097];
 
     assert(bytes < sizeof(scratch));
-    return unicode_norm_tokenize(
+    return unicode_bigram_tokenize_composed(
         text, bytes, scratch, sizeof(scratch), starts, ends, 4097, callback, context
     );
 }
