@@ -14,18 +14,24 @@ import (
 //
 // 共有 corpus は決まった事例しか見ないので、該当文字が載っていなければ気づけない。
 // 表そのものを突き合わせて、ずれた時点で落とす。
+func withoutCarriageReturns(text string) string {
+	return strings.ReplaceAll(text, "\r", "")
+}
+
 func TestLowercaseTableIsUpToDateWithTheRunningGo(t *testing.T) {
 	path := filepath.Join("..", "..", lowercaseTablePath)
 	committed, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
+	// 改行はチェックアウト次第で変わる (.gitattributes で LF に寄せてはいるが、
+	// 設定を変えた手元でこのテストが版の不一致を騙るのは避ける)。比べたいのは中身。
 	generated := lowercaseTable()
-	if string(committed) == generated {
+	if withoutCarriageReturns(string(committed)) == withoutCarriageReturns(generated) {
 		return
 	}
 
-	committedHeader := strings.SplitN(string(committed), "\n", 2)[0]
+	committedHeader := strings.SplitN(withoutCarriageReturns(string(committed)), "\n", 2)[0]
 	t.Fatalf(
 		"%s is stale: it was generated for a different Unicode version than the Go building "+
 			"the modernc driver (%s says %q, this Go has %s). The C and Go tokenizers would "+
