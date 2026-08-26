@@ -210,7 +210,7 @@ func TestCaseFoldingMatchesSharedCorpus(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if actual := lowercaseBigram(input); !bytes.Equal(actual, expected) {
+			if actual := []byte(lowercaseBigram(string(input))); !bytes.Equal(actual, expected) {
 				t.Fatalf("lowercase = %x, want %x", actual, expected)
 			}
 		})

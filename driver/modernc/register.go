@@ -206,26 +206,29 @@ func tokenize(
 	)
 	caseSensitive := libc.GoBytes(tokenizer, 1)[0] != 0
 	return walkBigrams(text, func(token []byte, start, end int) int32 {
+		// 文字列のまま扱う。strings.ToLower は変換が要らなければ入力をそのまま返すので、
+		// 大文字小文字を持たない文字 (日本語など) ではトークンごとの確保が起きない。
+		text := unsafe.String(&token[0], len(token))
 		if !caseSensitive {
-			token = lowercaseBigram(token)
+			text = lowercaseBigram(text)
 		}
 		result := callback(
 			tls,
 			context,
 			0,
-			uintptr(unsafe.Pointer(&token[0])),
-			int32(len(token)),
+			uintptr(unsafe.Pointer(unsafe.StringData(text))),
+			int32(len(text)),
 			int32(start),
 			int32(end),
 		)
+		runtime.KeepAlive(text)
 		runtime.KeepAlive(token)
 		return result
 	})
 }
 
-func lowercaseBigram(token []byte) []byte {
-	lowered := strings.ToLower(unsafe.String(&token[0], len(token)))
-	return []byte(lowered)
+func lowercaseBigram(token string) string {
+	return strings.ToLower(token)
 }
 
 // walkBigrams は隣り合う 2 コードポイントを 1 トークンとして送る。

@@ -51,6 +51,10 @@ combining mark; without composing first, the combining mark becomes a token unit
 of its own, so 「イド」 matches a search for 「イト」 and a composed query for
 「ガイ」 matches nothing. Files synced from macOS carry decomposed names and text.
 
+Composition is not optional and is unaffected by `case_sensitive`: the two
+settle different questions, whether a character is the same one and whether a
+letter is the same letter.
+
 Byte offsets passed to `xToken` keep pointing into the original text, so
 `snippet()` and `highlight()` still land on the source.
 
