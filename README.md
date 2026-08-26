@@ -169,12 +169,29 @@ Tagged GitHub Releases include x86-64 `.so` and `.dll`, a universal macOS
 ## Development
 
 ```sh
-go vet ./...
-go test ./...
+just check      # everything CI runs
+just generate   # rebuild the Unicode table the C tokenizer compiles in
+```
+
+Three toolchains build this, and a change to one can break another without
+saying so, so there is one command that runs them all: the Rust checks, the C
+core with its conformance tests, the Go adapter, and an install of the CMake
+package with a consumer built against it. `just --list` shows the pieces if you
+want to run one of them.
+
+`just` is a convenience, not a requirement:
+
+```sh
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
 cargo test --all-targets
 cmake -S . -B build
 cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
+gofmt -l .
+go vet ./...
+go test ./...
 ```
+
+`just generate` is needed when Go raises its Unicode version, because the table
+the C side compiles in is generated from it. A test says so when that happens.
