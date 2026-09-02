@@ -39,6 +39,9 @@ package: build-c
     cmake -S tests/cmake-package -B build-package-test -DCMAKE_PREFIX_PATH={{ justfile_directory() }}/install
     cmake --build build-package-test --config Release
 
+# -race: checkptr が付く。tokenizer は翻訳 C との境界でポインタを渡すので、
+# 「C から見て正当な確保でない領域を SQLite に読ませる」類の誤りはここでしか出ない。
+#
 # Go: 整形・vet・テスト (corpus / 適合性 / 生成表の追随)
 test-go:
     #!/usr/bin/env bash
@@ -50,7 +53,7 @@ test-go:
         exit 1
     fi
     go vet ./...
-    go test ./...
+    go test -race ./...
 
 # Go が Unicode の版を上げたときに要る (internal/generateunicode の test が教える)。
 #

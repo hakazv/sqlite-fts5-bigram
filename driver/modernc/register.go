@@ -17,7 +17,6 @@
 package modernc
 
 import (
-	"runtime"
 	"strings"
 	"unicode/utf8"
 	"unsafe"
@@ -205,6 +204,12 @@ func tokenize(
 		unsafe.Pointer(&struct{ pointer uintptr }{tokenCallback}),
 	)
 	caseSensitive := libc.GoBytes(tokenizer, 1)[0] != 0
+
+	// FTS5 は受け取った語をそのまま memcpy でハッシュへ写す。エミュレートされた C から
+	// 見て正当な確保でないと駄目なので、Go の側のメモリを直接渡さず C 側の作業領域へ写す。
+	var scratch cBuffer
+	defer scratch.free(tls)
+
 	return walkBigrams(text, func(token []byte, start, end int) int32 {
 		// 文字列のまま扱う。strings.ToLower は変換が要らなければ入力をそのまま返すので、
 		// 大文字小文字を持たない文字 (日本語など) ではトークンごとの確保が起きない。
@@ -212,19 +217,59 @@ func tokenize(
 		if !caseSensitive {
 			text = lowercaseBigram(text)
 		}
-		result := callback(
+		tokenPointer := scratch.store(tls, text)
+		if tokenPointer == 0 {
+			return sqliteNoMem
+		}
+		return callback(
 			tls,
 			context,
 			0,
-			uintptr(unsafe.Pointer(unsafe.StringData(text))),
+			tokenPointer,
 			int32(len(text)),
 			int32(start),
 			int32(end),
 		)
-		runtime.KeepAlive(text)
-		runtime.KeepAlive(token)
-		return result
 	})
+}
+
+// cBuffer は語を 1 つずつ渡すための C 側の作業領域。語ごとに確保し直さず、
+// 一番長い語に合わせて伸ばすだけにする (1 文書のトークン数だけ malloc が走らないように)。
+type cBuffer struct {
+	pointer uintptr
+	size    int
+}
+
+// store は token を作業領域へ写し、その C アドレスを返す。確保に失敗したら 0。
+//
+// FTS5 は語をコールバックの間だけ読む (そのまま索引へ写す) ので、次の語で同じ領域を
+// 上書きしてよい。SQLite 本体の tokenizer も同じ形で 1 つの領域を使い回している。
+func (b *cBuffer) store(tls *libc.TLS, token string) uintptr {
+	// sqlite3_malloc(0) は NULL を返す。空の語で確保の失敗と区別が付かなくなるので、
+	// 最低 1 バイトは持たせる。
+	need := max(len(token), 1)
+	if b.size < need {
+		if b.pointer != 0 {
+			sqlite3.Xsqlite3_free(tls, b.pointer)
+		}
+		b.pointer = sqlite3.Xsqlite3_malloc(tls, int32(need))
+		if b.pointer == 0 {
+			b.size = 0
+			return 0
+		}
+		b.size = need
+	}
+	// 写すのは今の語の分だけ。前の語の残りは後ろに残るが、長さを別に渡すので読まれない。
+	copy(libc.GoBytes(b.pointer, len(token)), token)
+	return b.pointer
+}
+
+func (b *cBuffer) free(tls *libc.TLS) {
+	if b.pointer != 0 {
+		sqlite3.Xsqlite3_free(tls, b.pointer)
+		b.pointer = 0
+		b.size = 0
+	}
 }
 
 func lowercaseBigram(token string) string {
