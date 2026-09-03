@@ -91,6 +91,38 @@ query, err := fts5bigram.PhraseQuery("全文検索")
 See the [Go integration test](driver/modernc/register_test.go) for table setup,
 parameter binding, and querying.
 
+### Writing another tokenizer
+
+Registering *any* FTS5 tokenizer with `modernc.org/sqlite` takes a fair amount of
+translated-ABI code: the `sqlite3_auto_extension` hook, fetching `fts5_api`
+through `SELECT fts5(?1)`, the scratch buffer tokens are handed to FTS5 through,
+and the unsafe pointer helpers. None of that is specific to `unicode_bigram`, so
+it lives in its own package:
+
+```go
+import "github.com/hakazv/sqlite-fts5-bigram/fts5modernc"
+
+var tokenizer = sqlite3.Tfts5_tokenizer_v2{
+    FiVersion:  2,
+    FxCreate:   fts5modernc.FunctionPointer(createTokenizer),
+    FxDelete:   fts5modernc.FunctionPointer(deleteTokenizer),
+    FxTokenize: fts5modernc.FunctionPointer(tokenize),
+}
+
+func init() {
+    if err := fts5modernc.RegisterTokenizer("my_tokenizer", &tokenizer); err != nil {
+        panic(err)
+    }
+}
+```
+
+`fts5modernc` has no side effects of its own — importing it registers nothing.
+The three function pointers must come from top-level functions; `FunctionPointer`
+cannot produce an address translated C can call for a closure.
+
+`driver/modernc` is built on it, and so is the `japanese_reading` tokenizer in
+[go-japanese-fts](https://github.com/hakazv/go-japanese-fts).
+
 ## Rust
 
 Add the Git dependency:
