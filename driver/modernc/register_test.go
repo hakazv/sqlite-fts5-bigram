@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/hex"
+	"github.com/hakazv/sqlite-fts5-bigram/fts5modernc"
 	"os"
 	"path/filepath"
 	"strings"
@@ -145,7 +146,7 @@ func TestTokenizerMatchesSharedCorpus(t *testing.T) {
 				return 0
 			})
 			if expectedResult == "invalid_utf8" {
-				if result != sqliteError || len(actual) != 0 {
+				if result != fts5modernc.ResultError || len(actual) != 0 {
 					t.Fatalf("result = %d, tokens = %x; want invalid UTF-8", result, actual)
 				}
 				return
