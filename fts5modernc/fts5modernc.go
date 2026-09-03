@@ -23,12 +23,17 @@ import (
 	sqlite3 "modernc.org/sqlite/lib"
 )
 
-// SQLite result codes used across tokenizer implementations.
+// SQLite result codes a tokenizer implementation returns. Anything else it
+// needs is in modernc.org/sqlite/lib; these are here because every tokenizer
+// uses them.
 const (
-	ResultError  = int32(1)
-	ResultNoMem  = int32(7)
-	ResultMisuse = int32(21)
-	ResultRow    = int32(100)
+	ResultError = int32(1)
+	ResultNoMem = int32(7)
+)
+
+const (
+	resultMisuse = int32(21)
+	resultRow    = int32(100)
 )
 
 // minimumLibVersion is SQLite 3.47, which added the locale-aware tokenizer v2
@@ -104,7 +109,7 @@ func RegisterTokenizer(name string, tokenizer *sqlite3.Tfts5_tokenizer_v2) error
 // a form translated C can call.
 func installTokenizers(tls *libc.TLS, db, _ /* error message */, _ /* SQLite API */ uintptr) int32 {
 	if db == 0 {
-		return ResultMisuse
+		return resultMisuse
 	}
 	if sqlite3.Xsqlite3_libversion_number(tls) < minimumLibVersion {
 		return ResultError
@@ -175,7 +180,7 @@ func fts5API(tls *libc.TLS, db uintptr) (*sqlite3.Tfts5_api, int32) {
 	result = sqlite3.Xsqlite3_bind_pointer(tls, statement, 1, apiPointer, CStringPointer(fts5APIPointerType), 0)
 	if result == 0 {
 		result = sqlite3.Xsqlite3_step(tls, statement)
-		if result == ResultRow {
+		if result == resultRow {
 			result = 0
 		}
 	}

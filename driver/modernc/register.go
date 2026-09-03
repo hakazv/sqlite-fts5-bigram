@@ -109,9 +109,7 @@ func tokenize(
 	}
 
 	text := libc.GoBytes(textPointer, int(textBytes))
-	callback := *(*func(*libc.TLS, uintptr, int32, uintptr, int32, int32, int32) int32)(
-		unsafe.Pointer(&struct{ pointer uintptr }{tokenCallback}),
-	)
+	callback := fts5modernc.TokenCallback(tokenCallback)
 	caseSensitive := libc.GoBytes(tokenizer, 1)[0] != 0
 
 	// FTS5 は受け取った語をそのまま memcpy でハッシュへ写す。エミュレートされた C から
