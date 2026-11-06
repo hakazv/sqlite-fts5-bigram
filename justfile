@@ -65,3 +65,7 @@ generate:
 vulncheck:
     go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
+# Rust クレートの既知の脆弱性を検査する
+audit-rust:
+    cargo audit
+
