@@ -46,3 +46,18 @@ func TestPhraseQueryRejectsUnsearchableInput(t *testing.T) {
 		})
 	}
 }
+
+func FuzzPhraseQuery(f *testing.F) {
+	for _, seed := range []string{"全文検索", `a"b`, "😀A", "e\u0301", "", "検", string([]byte{0xff})} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, text string) {
+		got, err := PhraseQuery(text)
+		if err != nil {
+			return
+		}
+		if len(got) < 2 || got[0] != '"' || got[len(got)-1] != '"' {
+			t.Fatalf("PhraseQuery(%q) = %q, expected quoted string", text, got)
+		}
+	})
+}
