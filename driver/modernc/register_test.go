@@ -160,7 +160,7 @@ func TestTokenizerMatchesSharedCorpus(t *testing.T) {
 
 			var expected [][]byte
 			if tokenHexes != "" {
-				for _, tokenHex := range strings.Split(tokenHexes, ",") {
+				for tokenHex := range strings.SplitSeq(tokenHexes, ",") {
 					token, err := hex.DecodeString(tokenHex)
 					if err != nil {
 						t.Fatal(err)

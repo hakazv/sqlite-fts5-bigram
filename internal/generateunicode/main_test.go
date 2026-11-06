@@ -31,7 +31,7 @@ func TestLowercaseTableIsUpToDateWithTheRunningGo(t *testing.T) {
 		return
 	}
 
-	committedHeader := strings.SplitN(withoutCarriageReturns(string(committed)), "\n", 2)[0]
+	committedHeader, _, _ := strings.Cut(withoutCarriageReturns(string(committed)), "\n")
 	t.Fatalf(
 		"%s is stale: it was generated for a different Unicode version than the Go building "+
 			"the modernc driver (%s says %q, this Go has %s). The C and Go tokenizers would "+

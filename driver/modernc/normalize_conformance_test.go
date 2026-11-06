@@ -82,7 +82,7 @@ func TestNormalizationMatchesUnicodeConformanceData(t *testing.T) {
 func codePoints(t *testing.T, field string) string {
 	t.Helper()
 	var builder strings.Builder
-	for _, value := range strings.Fields(field) {
+	for value := range strings.FieldsSeq(field) {
 		code, err := strconv.ParseUint(value, 16, 32)
 		if err != nil {
 			t.Fatalf("invalid code point %q: %v", value, err)
