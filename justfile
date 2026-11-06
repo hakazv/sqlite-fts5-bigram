@@ -5,7 +5,7 @@
 # ここにあるのは「正しい呼び方」の控えで、置き換えではない。
 
 # 3 つのツールチェインすべてを通す
-check: test-rust test-loadable test-c test-go package
+check: test-rust test-loadable test-c test-sanitizers test-go package
 
 # CMake: static / loadable のビルド
 build-c:
