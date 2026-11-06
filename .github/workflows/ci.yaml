@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   # justfile が手順の定義。手元で `just check` を叩くのと CI が同じものを通るようにして、
   # 両者がずれないようにする。ubuntu だけで呼ぶのは、just を 3 OS 分の runner へ
