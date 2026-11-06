@@ -60,3 +60,8 @@ test-go:
 # C が使う Unicode の表を作り直す
 generate:
     go generate ./...
+
+# 依存モジュールや標準ライブラリの既知の脆弱性を検査する
+vulncheck:
+    go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
