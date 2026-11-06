@@ -22,7 +22,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - uses: extractions/setup-just@v3
+      - uses: extractions/setup-just@v4
       - name: Check
         run: just check
 
@@ -74,7 +74,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - uses: extractions/setup-just@v3
+      - uses: extractions/setup-just@v4
       - name: Go vulnerability check
         run: just vulncheck
       - uses: taiki-e/install-action@cargo-audit
