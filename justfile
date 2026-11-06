@@ -30,6 +30,12 @@ test-loadable: build-c
 test-c: build-c
     ctest --test-dir build -C Release --output-on-failure
 
+# C の AddressSanitizer / UndefinedBehaviorSanitizer テスト
+test-sanitizers:
+    cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug -DENABLE_SANITIZERS=ON
+    cmake --build build-asan
+    ctest --test-dir build-asan --output-on-failure
+
 # install(EXPORT) の壊れはここでしか出ないので、独立した recipe にしてある
 # (内部ターゲットを export set に要求する等)。
 #

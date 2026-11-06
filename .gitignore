@@ -1,4 +1,5 @@
 /build/
+/build-asan/
 /target/
 install/
 build-package-test/

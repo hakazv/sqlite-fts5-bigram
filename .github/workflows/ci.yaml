@@ -25,6 +25,8 @@ jobs:
       - uses: extractions/setup-just@v3
       - name: Check
         run: just check
+      - name: Run C sanitizers (ASan / UBSan)
+        run: just test-sanitizers
 
   # C のビルドと中核テストが macOS / Windows でも通ること。
   test:
