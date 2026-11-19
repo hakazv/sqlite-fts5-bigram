@@ -3,7 +3,7 @@ module github.com/hakazv/sqlite-fts5-bigram
 go 1.27
 
 require (
-	golang.org/x/text v0.43.0
+	golang.org/x/text v0.44.0
 	modernc.org/libc v1.80.1
 	modernc.org/sqlite v1.62.0
 )
